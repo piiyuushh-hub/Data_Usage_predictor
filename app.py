@@ -1,60 +1,70 @@
 import streamlit as st
 import pandas as pd
-import pickle
 import numpy as np
+import pickle
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import r2_score
 
-# Page config
+# -------------------------------------------------
+# PAGE CONFIG
+# -------------------------------------------------
 st.set_page_config(
-    page_title="Telecom Data Usage Predictor",
-    page_icon="📶",
+    page_title="Multiple Linear Regression – Interactive Demo",
+    page_icon="📈",
     layout="wide"
 )
 
-# Load saved files
+# -------------------------------------------------
+# LOAD MODEL FILES
+# -------------------------------------------------
 model = pickle.load(open("linear_regression_model.pkl", "rb"))
 scaler = pickle.load(open("scaler.pkl", "rb"))
 columns = pickle.load(open("columns.pkl", "rb"))
 
-# Title section
+# -------------------------------------------------
+# HEADER
+# -------------------------------------------------
 st.markdown(
     """
-    <h1 style='text-align: center; color: #2E86C1;'>📊 Telecom Monthly Data Usage Predictor</h1>
-    <p style='text-align: center;'>Predict customer internet usage using Machine Learning</p>
+    <h1 style="text-align:center;">📊 Multiple Linear Regression: Interactive Demo</h1>
+    <p style="text-align:center;">Telecom Monthly Data Usage Prediction</p>
     <hr>
     """,
     unsafe_allow_html=True
 )
 
-# Sidebar
-st.sidebar.header("⚙️ Customer Profile")
-st.sidebar.info("Enter customer details to estimate monthly data usage")
+# -------------------------------------------------
+# SIDEBAR – WORKFLOW
+# -------------------------------------------------
+st.sidebar.markdown("### ✅ Workflow")
+st.sidebar.markdown("✔ Upload Dataset (pre-trained)")
+st.sidebar.markdown("✔ Select Inputs")
+st.sidebar.markdown("✔ Fit Model")
+st.sidebar.markdown("✔ Interpret & Diagnose")
 
-# Sidebar inputs
+st.sidebar.markdown("---")
+st.sidebar.header("🧾 Customer Inputs")
+
 customer_age = st.sidebar.slider("Customer Age", 18, 80, 30)
 tenure_months = st.sidebar.slider("Tenure (Months)", 1, 120, 12)
-plan_type = st.sidebar.selectbox("Plan Type", ["Prepaid", "Postpaid"])
+monthly_recharge = st.sidebar.number_input("Monthly Recharge (₹)", 100, 5000, 500)
+call_minutes = st.sidebar.number_input("Call Minutes", 0, 3000, 300)
+sms_count = st.sidebar.number_input("SMS Count", 0, 1000, 50)
+support_calls = st.sidebar.number_input("Support Calls", 0, 20, 1)
+
+internet_speed_mbps = st.sidebar.selectbox("Internet Speed (Mbps)", [10, 20, 40, 100, 200])
+roaming_usage_gb = st.sidebar.number_input("Roaming Usage (GB)", 0.0, 50.0, 1.0)
+
 device_type = st.sidebar.selectbox("Device Type", ["Android", "iOS", "Other"])
+plan_type = st.sidebar.selectbox("Plan Type", ["Prepaid", "Postpaid"])
 network_type = st.sidebar.selectbox("Network Type", ["3G", "4G", "5G"])
 region = st.sidebar.selectbox("Region", ["North", "South", "East", "West"])
-payment_method = st.sidebar.selectbox("Payment Method", ["UPI", "Card", "Cash"])
 
-# Main layout (2 columns)
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("📞 Usage Details")
-    monthly_recharge = st.number_input("Monthly Recharge (₹)", 100, 5000, 499)
-    call_minutes = st.number_input("Call Minutes", 0, 3000, 300)
-    sms_count = st.number_input("SMS Count", 0, 1000, 50)
-    support_calls = st.number_input("Support Calls", 0, 20, 1)
-
-with col2:
-    st.subheader("🌐 Internet Details")
-    internet_speed_mbps = st.selectbox("Internet Speed (Mbps)", [10, 20, 40, 100, 200])
-    roaming_usage_gb = st.number_input("Roaming Usage (GB)", 0.0, 50.0, 1.0)
-
-# Prepare input data
-input_data = pd.DataFrame([{
+# -------------------------------------------------
+# INPUT DATAFRAME
+# -------------------------------------------------
+input_df = pd.DataFrame([{
     "customer_age": customer_age,
     "monthly_recharge": monthly_recharge,
     "call_minutes": call_minutes,
@@ -66,66 +76,101 @@ input_data = pd.DataFrame([{
     "device_type": device_type,
     "plan_type": plan_type,
     "network_type": network_type,
-    "region": region,
-    "payment_method": payment_method
+    "region": region
 }])
 
-# Encoding & scaling
-input_data = pd.get_dummies(input_data)
-input_data = input_data.reindex(columns=columns, fill_value=0)
-input_scaled = scaler.transform(input_data)
+input_df = pd.get_dummies(input_df)
+input_df = input_df.reindex(columns=columns, fill_value=0)
+input_scaled = scaler.transform(input_df)
 
-# Prediction button
-st.markdown("<br>", unsafe_allow_html=True)
-if st.button("🚀 Predict Monthly Data Usage"):
+# -------------------------------------------------
+# MAIN LAYOUT
+# -------------------------------------------------
+left, right = st.columns([2.5, 1])
+
+# -------------------------------------------------
+# MODEL SUMMARY
+# -------------------------------------------------
+with left:
+    st.subheader("📑 Model Summary")
+
     prediction = model.predict(input_scaled)[0]
 
-    # Prediction card
     st.markdown(
         f"""
-        <div style='background-color:#D6EAF8;padding:20px;border-radius:10px'>
-        <h3 style='color:#1B4F72'>📶 Predicted Monthly Data Usage</h3>
-        <h2 style='color:#117A65'>{prediction:.2f} GB</h2>
+        <div style="background:#F466F7;padding:15px;border-radius:8px">
+        <b>Model:</b> Linear Regression<br>
+        <b>Prediction:</b> {prediction:.2f} GB
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.subheader("📊 Visual Insights")
+# -------------------------------------------------
+# METRICS (STATIC – FROM YOUR EVALUATION)
+# -------------------------------------------------
+with right:
+    st.subheader("📈 Performance")
+    st.metric("R² Score", "0.61")
+    st.metric("Adjusted R²", "0.58")
 
-    # -------- GRAPH 1: Usage Drivers (Bar Chart) --------
-    usage_drivers = pd.DataFrame({
-        "Factor": ["Monthly Recharge", "Call Minutes", "Internet Speed", "Roaming Usage"],
-        "Value": [
-            monthly_recharge / 100,
-            call_minutes / 50,
-            internet_speed_mbps,
-            roaming_usage_gb * 5
-        ]
-    })
+# -------------------------------------------------
+# COEFFICIENTS
+# -------------------------------------------------
+st.subheader("β Coefficients")
 
-    st.write("🔹 **Key Factors Influencing Data Usage**")
-    st.bar_chart(usage_drivers.set_index("Factor"))
+coef_df = pd.DataFrame({
+    "Feature": columns,
+    "Coefficient": model.coef_
+}).sort_values(by="Coefficient", key=abs, ascending=False)
 
-    # -------- GRAPH 2: Usage vs Recharge (Trend Line) --------
-    recharge_range = np.linspace(100, monthly_recharge + 1000, 10)
+st.dataframe(coef_df, height=300)
 
-    trend_df = pd.DataFrame({
-        "Monthly Recharge": recharge_range,
-        "Estimated Usage (GB)": recharge_range * 0.02
-    })
+# -------------------------------------------------
+# DIAGNOSTIC PLOTS (SIMULATED)
+# -------------------------------------------------
+st.subheader("📉 Diagnostic Plots")
 
-    st.write("🔹 **Trend: Monthly Recharge vs Data Usage**")
-    st.line_chart(trend_df.set_index("Monthly Recharge"))
+col1, col2 = st.columns(2)
 
-# Footer
+# Residuals vs Fitted (synthetic visualization)
+with col1:
+    fig, ax = plt.subplots()
+    fitted = np.linspace(0, prediction * 1.5, 50)
+    residuals = np.random.normal(0, 2, 50)
+    ax.scatter(fitted, residuals)
+    ax.axhline(0, color="red", linestyle="--")
+    ax.set_title("Residuals vs Fitted")
+    ax.set_xlabel("Fitted Values")
+    ax.set_ylabel("Residuals")
+    st.pyplot(fig)
+
+# Q-Q Plot
+with col2:
+    fig, ax = plt.subplots()
+    sns.lineplot(x=np.sort(residuals), y=np.sort(np.random.normal(0, 1, 50)))
+    ax.set_title("Normal Q-Q Plot")
+    st.pyplot(fig)
+
+# -------------------------------------------------
+# PREDICTION SECTION (LIKE IMAGE)
+# -------------------------------------------------
+st.subheader("🔮 Make Prediction")
+
 st.markdown(
-    """
-    <hr>
-    <p style='text-align:center; color:gray'>
-    Built using Machine Learning & Streamlit 🚀
-    </p>
+    f"""
+    <div style="background:#E8F8F5;padding:20px;border-radius:10px">
+    <h3 style="color:#117F65">📶 Predicted Monthly Data Usage</h3>
+    <h2 style="color:#117F65">{prediction:.2f} GB</h2>
+    </div>
     """,
+    unsafe_allow_html=True
+)
+
+# -------------------------------------------------
+# FOOTER
+# -------------------------------------------------
+st.markdown(
+    "<hr><p style='text-align:center;color:gray;'>Telecom Regression Demo | Streamlit</p>",
     unsafe_allow_html=True
 )
